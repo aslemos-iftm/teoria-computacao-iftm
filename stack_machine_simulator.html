@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador de Stack Machine — Webber Cap. 13</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f; --surf:#0e1120; --panel:#131629; --card:#191d2f;
+  --border:#252b44; --amber:#f5a623; --amber2:#ffc86b;
+  --green:#3dd68c; --red:#f06070; --blue:#5b9cf6;
+  --text:#dde4f2; --muted:#5a6480;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Barlow',sans-serif;
+  --cond:'Barlow Condensed',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);
+  min-height:100vh;font-size:15px}
+
+/* ── HEADER ────────────────────────────── */
+.hdr{background:var(--surf);border-bottom:1px solid var(--border);
+  padding:.85rem 1.5rem;display:flex;align-items:baseline;gap:1.25rem}
+.hdr-t{font-family:var(--cond);font-size:1.45rem;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;color:var(--amber)}
+.hdr-s{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+
+/* ── LAYOUT ────────────────────────────── */
+.app{display:grid;grid-template-columns:230px 295px 1fr;gap:1.1rem;
+  padding:1.1rem;max-width:1380px;margin:0 auto;align-items:start}
+
+/* ── CARD ──────────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden}
+.ch{background:var(--surf);border-bottom:1px solid var(--border);
+  padding:.48rem .9rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.ct{font-family:var(--cond);font-size:.72rem;font-weight:700;
+  letter-spacing:2px;color:var(--muted)}
+.cb{padding:.85rem}
+
+/* ── FORM ELEMENTS ─────────────────────── */
+.fl{display:block;font-family:var(--cond);font-size:.67rem;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.3rem}
+.fh{font-family:var(--mono);font-size:.7rem;color:var(--muted);
+  margin-bottom:.4rem;line-height:1.75}
+.fh code{color:var(--blue);background:rgba(91,156,246,.1);
+  padding:1px 4px;border-radius:3px}
+textarea,input[type=text]{
+  width:100%;background:var(--surf);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-family:var(--mono);font-size:.88rem;
+  padding:.48rem .68rem;outline:none;transition:border-color .15s;line-height:1.75}
+textarea:focus,input[type=text]:focus{border-color:var(--amber)}
+textarea{resize:vertical;min-height:130px}
+.fg{margin-bottom:.78rem}
+.ri{display:flex;gap:.55rem}
+.ri .gr{flex:1}
+.ri .sy input{text-align:center;font-size:1.05rem;width:54px}
+.emsg{font-family:var(--mono);font-size:.72rem;color:var(--red);
+  background:rgba(240,96,112,.08);border:1px solid rgba(240,96,112,.2);
+  border-radius:4px;padding:.3rem .6rem;margin-top:.3rem}
+
+/* ── LIBRARY SELECT ────────────────────── */
+select{
+  width:100%;background:var(--surf);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-family:var(--mono);font-size:.82rem;
+  padding:.42rem .58rem;outline:none;cursor:pointer;
+  -webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%235a6480'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right .65rem center}
+select:focus{border-color:var(--amber)}
+select option{background:#131629;color:var(--text)}
+select optgroup{color:var(--muted);font-style:normal;font-size:.68rem}
+
+/* ── BUTTONS ───────────────────────────── */
+.br{width:100%;padding:.6rem;background:var(--amber);border:none;border-radius:5px;
+  color:#07090f;font-family:var(--cond);font-size:.92rem;font-weight:700;
+  letter-spacing:2.5px;text-transform:uppercase;cursor:pointer;transition:background .15s}
+.br:hover{background:var(--amber2)}
+
+/* icon-button row */
+.btn-row{display:flex;gap:.5rem;margin-top:.55rem}
+.bi{flex:1;padding:.38rem .2rem;background:var(--surf);
+  border:1px solid var(--border);border-radius:5px;
+  color:var(--muted);font-family:var(--cond);font-size:.68rem;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;
+  transition:all .15s;text-align:center;white-space:nowrap}
+.bi:hover{border-color:var(--amber);color:var(--amber)}
+.bi.danger:hover{border-color:var(--red);color:var(--red)}
+.bi.act{border-color:var(--amber);color:var(--amber)}
+
+/* slot counter */
+.slot-bar{
+  display:flex;align-items:center;gap:.45rem;margin-top:.6rem;padding:.3rem 0}
+.slot-pips{display:flex;gap:3px}
+.pip{width:18px;height:6px;border-radius:3px;background:var(--border);transition:all .2s}
+.pip.on{background:var(--amber)}
+.pip.on.ex{background:var(--blue)}
+.slot-txt{font-family:var(--mono);font-size:.68rem;color:var(--muted)}
+
+/* ── NOTATION BOX ──────────────────────── */
+.ntbox{font-family:var(--mono);font-size:.7rem;color:var(--muted);
+  line-height:1.95;padding:.62rem .78rem;background:var(--surf);
+  border:1px solid var(--border);border-radius:5px;margin-top:.68rem}
+.ntbox b{color:var(--text)}
+
+/* ── PLACEHOLDER ───────────────────────── */
+.ph{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.85rem;padding:3rem 2rem;text-align:center}
+.ph-g{font-family:var(--mono);font-size:3rem;color:var(--border);line-height:1}
+.ph-t{font-size:.88rem;color:var(--muted);line-height:1.7}
+
+/* ── SIM WRAP ──────────────────────────── */
+.sw{display:flex;flex-direction:column;gap:.85rem}
+
+/* Two-column layout inside the sim panel */
+.sim-cols{
+  display:grid;
+  grid-template-columns:1fr 220px;
+  gap:.85rem;
+  align-items:start;
+}
+.sim-main{display:flex;flex-direction:column;gap:.85rem}
+/* DI sidebar — fixed to the panel height so it never pushes content */
+.di-col{
+  display:flex;flex-direction:column;
+  position:sticky;top:0;
+}
+.di-col .card{
+  display:flex;flex-direction:column;
+  max-height:calc(100vh - 120px);
+}
+.idm-row{display:flex;align-items:center;gap:.4rem;min-width:0}
+.di-col .hbox{max-height:none}
+
+/* ── HISTORY ───────────────────────────── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.hbox{max-height:195px;overflow-y:auto;overflow-x:hidden;
+  padding:.38rem .52rem;display:flex;flex-direction:column;gap:2px}
+.hbtns{display:flex;gap:.35rem;margin-left:auto}
+.bsm{padding:.18rem .48rem;background:transparent;border:1px solid var(--border);
+  border-radius:4px;color:var(--muted);font-family:var(--cond);font-size:.63rem;
+  font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  cursor:pointer;transition:all .12s}
+.bsm:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+.bsm:disabled{opacity:.25;cursor:default}
+
+.idr{display:flex;align-items:center;gap:.52rem;padding:.25rem .42rem;
+  border-radius:4px;border:1px solid transparent;cursor:pointer;
+  transition:all .12s;min-width:0}
+.idr:hover{background:var(--card);border-color:var(--border)}
+.idr.cur{background:rgba(245,166,35,.07);border-color:rgba(245,166,35,.28)}
+.idn{font-family:var(--mono);font-size:.67rem;color:var(--muted);
+  min-width:20px;text-align:right;flex-shrink:0}
+.idv{font-family:var(--mono);font-size:.82rem;color:var(--text);
+  white-space:nowrap;flex-shrink:0;max-width:220px;
+  overflow:hidden;text-overflow:ellipsis;font-weight:500}
+.idr.cur .idv{color:var(--amber);font-weight:700}
+.idm{font-family:var(--mono);font-size:.7rem;color:var(--muted);
+  flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-style:italic;min-width:0}
+.idc{font-family:var(--cond);font-size:.62rem;letter-spacing:1px;
+  color:var(--amber);flex-shrink:0;font-weight:700}
+
+/* ── STATE VIEW ────────────────────────── */
+.stv{display:flex;gap:1.25rem;align-items:start}
+.tape-sec{flex:1;min-width:0}
+.stack-sec{flex:0 0 auto;min-width:105px}
+.stl{font-family:var(--cond);font-size:.64rem;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.42rem}
+.trow{display:flex;align-items:center;gap:3px;flex-wrap:wrap;min-height:40px}
+.tc{width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:1.05rem;font-weight:700;border-radius:5px;
+  border:1px solid var(--border);background:var(--card);color:var(--text);transition:all .2s}
+.tc.con{color:var(--muted);background:transparent;border-color:transparent;
+  opacity:.35;text-decoration:line-through}
+.tc.crs{border-color:var(--amber);color:var(--amber);
+  box-shadow:0 0 10px rgba(245,166,35,.28)}
+.tdone{font-family:var(--mono);font-size:.73rem;color:var(--green);margin-left:.4rem}
+.tempty{font-family:var(--mono);font-size:.78rem;color:var(--muted);font-style:italic}
+.scw{display:flex;flex-direction:column;align-items:flex-start;gap:3px}
+.scr{display:flex;align-items:center;gap:.38rem}
+.sc{width:48px;height:32px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:1.05rem;font-weight:700;border-radius:4px;
+  border:1px solid var(--border);background:var(--card);color:var(--text);transition:all .25s}
+.sc.top{border-color:var(--amber);color:var(--amber);background:rgba(245,166,35,.07)}
+.sct{font-family:var(--cond);font-size:.6rem;letter-spacing:.5px;
+  color:var(--amber);white-space:nowrap}
+.scb{font-family:var(--cond);font-size:.58rem;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--muted);margin-top:3px;padding-left:2px}
+.scempty{font-family:var(--mono);font-size:.82rem;color:var(--green);font-style:italic}
+.cfgb{font-family:var(--mono);font-size:.75rem;color:var(--amber);
+  background:rgba(245,166,35,.09);border:1px solid rgba(245,166,35,.22);
+  border-radius:4px;padding:.14rem .48rem;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;max-width:260px}
+
+/* ── NEXT STEP ─────────────────────────── */
+.nids{display:flex;flex-direction:column;gap:4px}
+.nid-empty{font-family:var(--mono);font-size:.8rem;color:var(--muted);
+  font-style:italic;padding:.3rem 0}
+.nidr{display:flex;align-items:center;gap:.65rem;padding:.42rem .75rem;
+  border-radius:5px;border:1px solid var(--border);background:var(--card);
+  cursor:pointer;transition:all .15s;min-width:0}
+.nidr:hover{border-color:var(--blue);background:rgba(91,156,246,.06);
+  box-shadow:0 0 8px rgba(91,156,246,.12)}
+.nidr .mvcol{font-family:var(--mono);font-size:.82rem;color:var(--blue);flex-shrink:0}
+.nidr .arrcol{color:var(--border);font-size:.9rem;flex-shrink:0}
+.nidr .nidcol{font-family:var(--mono);font-size:.85rem;color:var(--text);
+  flex:1;font-weight:500;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;min-width:0}
+.tag-ok{font-family:var(--cond);font-size:.62rem;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--green);flex-shrink:0}
+.tag-dead{font-family:var(--cond);font-size:.62rem;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--red);flex-shrink:0}
+.tag-cnt{font-family:var(--cond);font-size:.62rem;letter-spacing:1px;
+  color:var(--muted);flex-shrink:0}
+
+/* ── TERMINAL BANNERS ──────────────────── */
+.tbanner{display:flex;align-items:center;gap:1rem;
+  padding:.9rem 1.1rem;border-radius:8px;border:1px solid}
+.tbanner.ok{background:rgba(61,214,140,.07);border-color:rgba(61,214,140,.3)}
+.tbanner.fail{background:rgba(240,96,112,.07);border-color:rgba(240,96,112,.3)}
+.tbi{font-size:1.5rem;flex-shrink:0}
+.tbt{font-family:var(--cond);font-size:1rem;font-weight:700;
+  letter-spacing:2px;text-transform:uppercase}
+.tbanner.ok .tbi,.tbanner.ok .tbt{color:var(--green)}
+.tbanner.fail .tbi,.tbanner.fail .tbt{color:var(--red)}
+.tbs{font-family:var(--mono);font-size:.75rem;color:var(--muted);margin-top:.2rem}
+
+/* ── TOAST NOTIFICATION ────────────────── */
+#toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;
+  font-family:var(--mono);font-size:.78rem;
+  padding:.55rem 1rem;border-radius:6px;
+  border:1px solid;pointer-events:none;
+  opacity:0;transition:opacity .25s;
+}
+#toast.show{opacity:1}
+#toast.info{background:rgba(91,156,246,.15);border-color:rgba(91,156,246,.35);color:var(--blue)}
+#toast.warn{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.35);color:var(--amber)}
+#toast.ok  {background:rgba(61,214,140,.12);border-color:rgba(61,214,140,.35);color:var(--green)}
+#toast.err {background:rgba(240,96,112,.12);border-color:rgba(240,96,112,.35);color:var(--red)}
+
+/* ── DIVIDER ───────────────────────────── */
+.sep{border:none;border-top:1px solid var(--border);margin:.65rem 0}
+
+/* ── EPSILON TOOLBAR ───────────────────── */
+.eps-bar{display:flex;align-items:center;gap:.45rem;margin-top:.38rem}
+.btn-eps{
+  padding:.22rem .72rem;background:var(--surf);
+  border:1px solid var(--border);border-radius:5px;
+  color:var(--amber);font-family:var(--mono);font-size:1.05rem;font-weight:700;
+  cursor:pointer;transition:all .15s;line-height:1;
+  box-shadow:0 1px 3px rgba(0,0,0,.25);
+}
+.btn-eps:hover{
+  background:rgba(245,166,35,.12);border-color:var(--amber);
+  box-shadow:0 0 8px rgba(245,166,35,.25);
+}
+.btn-eps:active{transform:scale(.93)}
+.eps-hint{font-family:var(--mono);font-size:.67rem;color:var(--muted)}</style>
+</head>
+<body>
+
+<div class="hdr">
+  <span class="hdr-t">Stack Machine</span>
+  <span class="hdr-s">Webber · <em>Formal Language: A Practical Introduction</em> · Cap. 13</span>
+</div>
+
+<div class="app">
+
+  <!-- ══════════════════════════════════════
+       COL 1 — MACHINE LIBRARY
+  ═══════════════════════════════════════ -->
+  <div>
+    <div class="card">
+      <div class="ch"><span class="ct">Biblioteca</span></div>
+      <div class="cb">
+
+        <div class="fg">
+          <span class="fl">Máquina</span>
+          <select id="lib-sel" title="Selecione uma máquina para carregar no editor"></select>
+        </div>
+
+        <div class="fg">
+          <span class="fl">Nome</span>
+          <input type="text" id="mach-name" placeholder="Nome da máquina…" maxlength="40" spellcheck="false">
+        </div>
+
+        <div class="btn-row">
+          <button class="bi" id="btn-new"   title="Limpar editor para criar uma nova máquina">Nova</button>
+          <button class="bi" id="btn-save"  title="Salvar máquina atual (máx. 5)">Salvar</button>
+          <button class="bi danger" id="btn-del" title="Apagar máquina salva selecionada">Apagar</button>
+        </div>
+
+        <hr class="sep">
+
+        <div class="btn-row">
+          <button class="bi" id="btn-exp" title="Exportar máquina atual como arquivo JSON">↓ Exportar</button>
+          <button class="bi" id="btn-imp" title="Importar máquina de um arquivo JSON">↑ Importar</button>
+        </div>
+        <input type="file" id="file-inp" accept=".json,.txt" style="display:none">
+
+        <!-- slot indicator -->
+        <div class="slot-bar">
+          <div class="slot-pips" id="slot-pips"></div>
+          <span class="slot-txt" id="slot-txt"></span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       COL 2 — EDITOR
+  ═══════════════════════════════════════ -->
+  <div>
+    <div class="card">
+      <div class="ch"><span class="ct">Definição da Máquina</span></div>
+      <div class="cb">
+
+        <div class="fg">
+          <span class="fl">Movimentos</span>
+          <div class="fh">Formato: <code>leitura, desempilha → empilha</code><br>
+            Um por linha · <code>ε</code> para vazio · aceita <code>-></code> ou <code>→</code></div>
+          <textarea id="moves-ta" spellcheck="false"
+            placeholder="a, S → Sb&#10;ε, S → ε&#10;b, b → ε"></textarea>
+          <div class="eps-bar">
+            <button class="btn-eps" id="btn-eps" title="Inserir ε na posição do cursor">ε</button>
+            <span class="eps-hint">insere ε na posição do cursor</span>
+          </div>
+          <div id="err" class="emsg" style="display:none"></div>
+        </div>
+
+        <div class="fg">
+          <div class="ri">
+            <div class="gr">
+              <span class="fl">Cadeia de entrada</span>
+              <input type="text" id="inp-s" placeholder="aabb" spellcheck="false">
+            </div>
+            <div class="sy">
+              <span class="fl">Pilha inicial</span>
+              <input type="text" id="inp-k" value="S" maxlength="2">
+            </div>
+          </div>
+        </div>
+
+        <button class="br" id="btn-run">▶ Iniciar Simulação</button>
+
+        <div class="ntbox">
+          <b>(leitura, desempilha) → empilha</b><br>
+          • <b>leitura</b>: símbolo da entrada ou ε<br>
+          • <b>desempilha</b>: topo da pilha (obrigatório)<br>
+          • <b>empilha</b>: string; 1º char fica no topo; ε = nada<br><br>
+          <b>Aceita</b>: entrada <em>e</em> pilha vazias simultaneamente<br>
+          <b>Notação DI</b>: (entrada restante, conteúdo da pilha)
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       COL 3 — SIMULATION
+  ═══════════════════════════════════════ -->
+  <div class="card">
+    <div class="ch"><span class="ct">Simulação Interativa</span></div>
+    <div class="cb">
+      <div class="ph" id="ph">
+        <div class="ph-g">⊢</div>
+        <div class="ph-t">Defina ou carregue uma máquina e clique<br><strong>Iniciar Simulação</strong>.</div>
+      </div>
+      <div id="sa" style="display:none"></div>
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════
+   BUILT-IN EXAMPLES  (not editable, not counted in slots)
+═══════════════════════════════════════════════════ */
+const EXAMPLES = [
+  { id:'ex-anbn',
+    name:'aⁿbⁿ  (exemplo)',
+    moves:'a, S → Sb\nε, S → ε\nb, b → ε',
+    input:'aabb', stack:'S' },
+  { id:'ex-parens',
+    name:'Parênteses balanceados  (exemplo)',
+    moves:'(, S → S)S\nε, S → ε\n), ) → ε',
+    input:'(())', stack:'S' },
+  { id:'ex-wwR',
+    name:'wwᴿ  (exemplo)',
+    moves:'a, S → Sa\nb, S → Sb\nε, S → ε\na, a → ε\nb, b → ε',
+    input:'abba', stack:'S' },
+];
+
+const MAX_SAVED = 5;
+
+/* ═══════════════════════════════════════════════════
+   SESSION STORAGE  (in-memory only)
+═══════════════════════════════════════════════════ */
+let saved = [];          // array of { id, name, moves, input, stack }
+let nextId = 1;
+let currentSelId = null; // id of selected machine ('ex-*' or numeric id)
+
+/* ═══════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════ */
+let toastTimer = null;
+function toast(msg, type='info'){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.className=''; }, 2800);
+}
+
+/* ═══════════════════════════════════════════════════
+   LIBRARY UI
+═══════════════════════════════════════════════════ */
+function rebuildSelect(selectId){
+  const sel = document.getElementById('lib-sel');
+  sel.innerHTML = '';
+
+  // Examples group
+  const gEx = document.createElement('optgroup');
+  gEx.label = '── Exemplos ──';
+  for(const ex of EXAMPLES){
+    const o = document.createElement('option');
+    o.value = ex.id; o.textContent = ex.name;
+    if(ex.id === selectId) o.selected = true;
+    gEx.appendChild(o);
+  }
+  sel.appendChild(gEx);
+
+  // Saved group
+  if(saved.length){
+    const gSv = document.createElement('optgroup');
+    gSv.label = '── Salvas ──';
+    for(const m of saved){
+      const o = document.createElement('option');
+      o.value = m.id; o.textContent = m.name;
+      if(m.id === selectId) o.selected = true;
+      gSv.appendChild(o);
+    }
+    sel.appendChild(gSv);
+  }
+
+  updateSlotBar();
+  updateDelBtn();
+}
+
+function updateSlotBar(){
+  const pips = document.getElementById('slot-pips');
+  const txt  = document.getElementById('slot-txt');
+  pips.innerHTML = '';
+  for(let i=0; i<MAX_SAVED; i++){
+    const d = document.createElement('div');
+    d.className = 'pip' + (i < saved.length ? ' on' : '');
+    pips.appendChild(d);
+  }
+  txt.textContent = `${saved.length} / ${MAX_SAVED} salvas`;
+}
+
+function updateDelBtn(){
+  const sel = document.getElementById('lib-sel');
+  const id  = sel.value;
+  const isSaved = saved.some(m => String(m.id) === String(id));
+  document.getElementById('btn-del').style.opacity = isSaved ? '1' : '.3';
+  document.getElementById('btn-del').style.pointerEvents = isSaved ? '' : 'none';
+}
+
+/* ═══════════════════════════════════════════════════
+   LOAD MACHINE INTO EDITOR
+═══════════════════════════════════════════════════ */
+function loadMachine(m){
+  document.getElementById('mach-name').value = m.name.replace(/ \(exemplo\)$/, '');
+  document.getElementById('moves-ta').value  = m.moves;
+  document.getElementById('inp-s').value     = m.input;
+  document.getElementById('inp-k').value     = m.stack;
+  document.getElementById('err').style.display = 'none';
+  currentSelId = m.id;
+  rebuildSelect(m.id);
+}
+
+function getMachineFromEditor(){
+  return {
+    name:  document.getElementById('mach-name').value.trim() || 'Sem nome',
+    moves: document.getElementById('moves-ta').value,
+    input: document.getElementById('inp-s').value,
+    stack: document.getElementById('inp-k').value.trim().slice(0,1) || 'S',
+  };
+}
+
+/* ═══════════════════════════════════════════════════
+   SAVE / DELETE
+═══════════════════════════════════════════════════ */
+function saveMachine(){
+  const m = getMachineFromEditor();
+  if(!m.name){ toast('Dê um nome à máquina antes de salvar.','warn'); return; }
+
+  // Check if currently selected is an existing saved machine → overwrite
+  const selId = document.getElementById('lib-sel').value;
+  const existing = saved.find(x => String(x.id) === String(selId));
+  if(existing){
+    existing.name  = m.name;
+    existing.moves = m.moves;
+    existing.input = m.input;
+    existing.stack = m.stack;
+    currentSelId   = existing.id;
+    rebuildSelect(existing.id);
+    toast(`"${m.name}" atualizada.`, 'ok');
+    return;
+  }
+
+  // New save
+  if(saved.length >= MAX_SAVED){
+    toast(`Limite de ${MAX_SAVED} máquinas salvas atingido. Apague uma antes.`, 'warn');
+    return;
+  }
+  const id = nextId++;
+  saved.push({ id, name:m.name, moves:m.moves, input:m.input, stack:m.stack });
+  currentSelId = id;
+  rebuildSelect(id);
+  toast(`"${m.name}" salva.`, 'ok');
+}
+
+function deleteMachine(){
+  const selId = document.getElementById('lib-sel').value;
+  const idx   = saved.findIndex(x => String(x.id) === String(selId));
+  if(idx < 0) return;
+  const name = saved[idx].name;
+  saved.splice(idx, 1);
+  const fallback = saved.length ? saved[saved.length-1].id : EXAMPLES[0].id;
+  currentSelId = fallback;
+  rebuildSelect(fallback);
+  // load fallback
+  const fm = saved.find(x=>x.id===fallback) || EXAMPLES.find(x=>x.id===fallback);
+  if(fm) loadMachine(fm);
+  toast(`"${name}" apagada.`, 'info');
+}
+
+/* ═══════════════════════════════════════════════════
+   EXPORT / IMPORT
+═══════════════════════════════════════════════════ */
+function exportMachine(){
+  const m = getMachineFromEditor();
+  const blob = new Blob([JSON.stringify(m, null, 2)], {type:'application/json'});
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = (m.name.replace(/[^a-zA-Z0-9_\-]/g,'_') || 'maquina') + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`Exportada: ${a.download}`, 'ok');
+}
+
+function importMachine(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const m = JSON.parse(e.target.result);
+      if(typeof m.moves !== 'string') throw new Error('Campo "moves" ausente.');
+      loadMachine({
+        id: '_import_',
+        name:  (m.name  || 'Importada'),
+        moves: (m.moves || ''),
+        input: (m.input || ''),
+        stack: (m.stack || 'S'),
+      });
+      // deselect saved id so user must explicitly save
+      rebuildSelect(null);
+      toast(`"${m.name||'Importada'}" carregada — salve para manter.`, 'info');
+    } catch(err){
+      toast('Erro ao importar: ' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ═══════════════════════════════════════════════════
+   PARSER
+═══════════════════════════════════════════════════ */
+const EPS_SET = new Set(['ε','λ','e']);
+function toEps(s){ s=s.trim(); return EPS_SET.has(s)?'':s; }
+
+function parseMove(line){
+  line=line.trim();
+  if(!line||line[0]==='#'||line.slice(0,2)==='//') return null;
+  let ai=line.indexOf('→'), al=1;
+  if(ai<0){ai=line.indexOf('->');al=2;}
+  if(ai<0) return {err:`Seta "→" não encontrada: "${line}"`};
+  const lhs=line.slice(0,ai).trim(), rhs=line.slice(ai+al).trim();
+  const ci=lhs.indexOf(',');
+  if(ci<0) return {err:`Vírgula não encontrada: "${line}"`};
+  const read=toEps(lhs.slice(0,ci)), pop=lhs.slice(ci+1).trim(), push=toEps(rhs);
+  if(read.length>1) return {err:`Leitura: 1 símbolo ou ε: "${line}"`};
+  if(pop.length!==1) return {err:`Desempilhamento: 1 símbolo: "${line}"`};
+  return {read,pop,push};
+}
+
+function parseMoves(text){
+  const moves=[];
+  for(const ln of text.split('\n')){
+    if(!ln.trim()) continue;
+    const r=parseMove(ln);
+    if(!r) continue;
+    if(r.err) return {err:r.err};
+    moves.push(r);
+  }
+  if(!moves.length) return {err:'Nenhum movimento definido.'};
+  return {moves};
+}
+
+/* ═══════════════════════════════════════════════════
+   ENGINE
+═══════════════════════════════════════════════════ */
+function tryMove(state,mv){
+  const {input,stack}=state;
+  // Stack top must match the pop symbol (always required)
+  if(stack.length===0 || stack[stack.length-1]!==mv.pop) return null;
+  // Epsilon move (mv.read===''): does NOT consume input, applicable regardless of input content
+  if(mv.read!==''){
+    // Non-epsilon: must consume one matching symbol from input
+    if(input.length===0 || input[0]!==mv.read) return null;
+  }
+  const ni = mv.read==='' ? input : input.slice(1);
+  const ns=stack.slice(0,-1);
+  for(let i=mv.push.length-1;i>=0;i--) ns.push(mv.push[i]);
+  return {input:ni,stack:ns};
+}
+function appList(moves,state){
+  return moves.map((mv,i)=>({mv,i})).filter(({mv})=>tryMove(state,mv)!==null);
+}
+function stkStr(s){ return s.length>0?[...s].reverse().join(''):'ε'; }
+function fmtID(s){ return `(${s.input.length>0?s.input:'ε'}, ${stkStr(s.stack)})`; }
+function fmtMv(mv){ return `${mv.read!==''?mv.read:'ε'}, ${mv.pop} → ${mv.push!==''?mv.push:'ε'}`; }
+
+/* ═══════════════════════════════════════════════════
+   SIMULATION STATE
+═══════════════════════════════════════════════════ */
+const G={moves:[],history:[]};
+
+window.applyMoveIdx=function(i){
+  const mv=G.moves[i];
+  const cur=G.history[G.history.length-1];
+  const ns=tryMove({input:cur.input,stack:cur.stack},mv);
+  if(!ns) return;
+  G.history.push({input:ns.input,stack:ns.stack,mv});
+  render();
+};
+
+window.jumpTo=function(i){
+  if(i>=0&&i<G.history.length){
+    G.history=G.history.slice(0,i+1);
+    render();
+  }
+};
+
+/* ═══════════════════════════════════════════════════
+   RENDER HELPERS
+═══════════════════════════════════════════════════ */
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function renderHistory(){
+  const n=G.history.length, dis=n<=1?'disabled':'';
+  let h=`<div class="card">
+    <div class="ch" style="flex-wrap:wrap;gap:.3rem">
+      <span class="ct">DIs</span>
+      <div class="hbtns">
+        <button class="bsm" ${dis} onclick="window.jumpTo(${n-2})">↩</button>
+        <button class="bsm" onclick="window.jumpTo(0)">⟳</button>
+      </div>
+    </div>
+    <div class="hbox" id="hb">`;
+  for(let i=0;i<n;i++){
+    const e=G.history[i], isc=(i===n-1);
+    const id=fmtID({input:e.input,stack:e.stack});
+    const mv=e.mv?fmtMv(e.mv):'config. inicial';
+    h+=`<div class="idr${isc?' cur':''}" onclick="window.jumpTo(${i})"
+        title="${isc?'DI atual':'Retornar aqui (descarta passos seguintes)'}">
+      <span class="idn">${i}</span>
+      <span class="idv" style="max-width:none">${esc(id)}</span>
+    </div>
+    <div class="idm-row" style="padding-left:1.8rem;margin-top:-2px;margin-bottom:2px">
+      <span class="idm">${e.mv?'← '+esc(mv):esc(mv)}</span>
+      ${isc?'<span class="idc">◀</span>':''}
+    </div>`;
+  }
+  h+=`</div></div>`;
+  return h;
+}
+
+function renderState(cur,origInp,consumed){
+  let tape='';
+  if(!origInp){
+    tape='<span class="tempty">entrada vazia</span>';
+  } else {
+    for(let i=0;i<origInp.length;i++){
+      const cls=i<consumed?'con':i===consumed?'crs':'';
+      tape+=`<div class="tc ${cls}">${esc(origInp[i])}</div>`;
+    }
+    if(consumed>=origInp.length) tape+='<span class="tdone">esgotada ✓</span>';
+  }
+  let stk='';
+  if(!cur.stack.length){
+    stk='<div class="scempty">∅ vazia ✓</div>';
+  } else {
+    for(let i=cur.stack.length-1;i>=0;i--){
+      const isTop=(i===cur.stack.length-1);
+      stk+=`<div class="scr">
+        <div class="sc${isTop?' top':''}">${esc(cur.stack[i])}</div>
+        ${isTop?'<span class="sct">← topo</span>':''}
+      </div>`;
+    }
+    stk+='<div class="scb">── fundo</div>';
+  }
+  return `<div class="card">
+    <div class="ch">
+      <span class="ct">Configuração Atual</span>
+      <span class="cfgb">${esc(fmtID(cur))}</span>
+    </div>
+    <div class="cb" style="display:flex;gap:1.25rem;align-items:start">
+      <div style="flex:1;min-width:0">
+        <div class="stl">Fita de Entrada</div>
+        <div class="trow">${tape}</div>
+      </div>
+      <div style="flex:0 0 auto;min-width:105px">
+        <div class="stl">Pilha</div>
+        <div class="scw">${stk}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderAccept(){
+  return `<div class="tbanner ok">
+    <span class="tbi">✓</span>
+    <div>
+      <div class="tbt">Cadeia Aceita</div>
+      <div class="tbs">Entrada e pilha simultaneamente vazias — configuração de aceitação.</div>
+    </div>
+  </div>`;
+}
+
+function renderDead(){
+  return `<div class="tbanner fail">
+    <span class="tbi">✗</span>
+    <div>
+      <div class="tbt">Caminho Morto</div>
+      <div class="tbs">Nenhum movimento aplicável. Entrada ou pilha não-vazias — rejeição neste ramo.</div>
+    </div>
+  </div>`;
+}
+
+function renderNextStep(apMoves,state){
+  let rows='';
+  for(const {mv,i} of apMoves){
+    const ns=tryMove(state,mv);
+    const nsAcc=(ns.input.length===0)&&(ns.stack.length===0);
+    const nsDead=!nsAcc&&appList(G.moves,{input:ns.input,stack:ns.stack}).length===0;
+    const nsCnt=appList(G.moves,{input:ns.input,stack:ns.stack}).length;
+    const tag=nsAcc?'<span class="tag-ok">✓ aceita</span>'
+             :nsDead?'<span class="tag-dead">✗ morto</span>'
+             :`<span class="tag-cnt">${nsCnt} mov.</span>`;
+    rows+=`<div class="nidr" onclick="window.applyMoveIdx(${i})">
+      <span class="mvcol">${esc(fmtMv(mv))}</span>
+      <span class="arrcol">→</span>
+      <span class="nidcol">${esc(fmtID({input:ns.input,stack:ns.stack}))}</span>
+      ${tag}
+    </div>`;
+  }
+  return `<div class="card">
+    <div class="ch"><span class="ct">Próximo Passo — Escolha um Movimento</span></div>
+    <div class="cb"><div class="nids">${rows||'<span class="nid-empty">nenhum</span>'}</div></div>
+  </div>`;
+}
+
+function render(){
+  const cur=G.history[G.history.length-1];
+  const state={input:cur.input,stack:cur.stack};
+  const ap=appList(G.moves,state);
+  const isAcc=(cur.input.length===0)&&(cur.stack.length===0);
+  const isDead=!isAcc&&ap.length===0;
+  const origInp=G.history[0].input;
+  const consumed=origInp.length-cur.input.length;
+
+  const sa=document.getElementById('sa');
+  sa.innerHTML=`<div class="sim-cols">
+    <div class="sim-main">
+      ${renderState(cur,origInp,consumed)}
+      ${isAcc?renderAccept():isDead?renderDead():renderNextStep(ap,state)}
+    </div>
+    <div class="di-col">
+      ${renderHistory()}
+    </div>
+  </div>`;
+
+  const hb=document.getElementById('hb');
+  if(hb) hb.scrollTop=hb.scrollHeight;
+}
+
+/* ═══════════════════════════════════════════════════
+   INIT SIMULATION
+═══════════════════════════════════════════════════ */
+function initSim(){
+  const txt=document.getElementById('moves-ta').value;
+  const inp=document.getElementById('inp-s').value;
+  const stk=document.getElementById('inp-k').value.trim().slice(0,1);
+  const errEl=document.getElementById('err');
+  const pr=parseMoves(txt);
+  if(pr.err){
+    errEl.textContent='⚠ '+pr.err;
+    errEl.style.display='';
+    return;
+  }
+  errEl.style.display='none';
+  G.moves=pr.moves;
+  G.history=[{input:inp,stack:stk?[stk]:[],mv:null}];
+  document.getElementById('ph').style.display='none';
+  document.getElementById('sa').style.display='';
+  render();
+}
+
+/* ═══════════════════════════════════════════════════
+   EVENTS
+═══════════════════════════════════════════════════ */
+// Library selector
+document.getElementById('lib-sel').addEventListener('change', function(){
+  const id=this.value;
+  const ex=EXAMPLES.find(x=>x.id===id);
+  const sv=saved.find(x=>String(x.id)===String(id));
+  const m=ex||sv;
+  if(m) loadMachine(m);
+  updateDelBtn();
+});
+
+// New
+document.getElementById('btn-new').onclick=()=>{
+  document.getElementById('mach-name').value='';
+  document.getElementById('moves-ta').value='';
+  document.getElementById('inp-s').value='';
+  document.getElementById('inp-k').value='S';
+  document.getElementById('err').style.display='none';
+  // deselect in dropdown
+  const sel=document.getElementById('lib-sel');
+  sel.selectedIndex=-1;
+  updateDelBtn();
+  document.getElementById('mach-name').focus();
+  toast('Editor limpo — defina sua máquina.','info');
+};
+
+// Save
+document.getElementById('btn-save').onclick=saveMachine;
+
+// Delete
+document.getElementById('btn-del').onclick=deleteMachine;
+
+// Export
+document.getElementById('btn-exp').onclick=exportMachine;
+
+// Import
+document.getElementById('btn-imp').onclick=()=>
+  document.getElementById('file-inp').click();
+
+document.getElementById('file-inp').addEventListener('change',function(){
+  if(this.files&&this.files[0]) importMachine(this.files[0]);
+  this.value=''; // reset so same file can be re-imported
+});
+
+// Epsilon insert
+document.getElementById('btn-eps').addEventListener('mousedown', function(e){
+  // preventDefault keeps textarea focus (cursor position intact)
+  e.preventDefault();
+  const ta  = document.getElementById('moves-ta');
+  const s   = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const v   = ta.value;
+  ta.value  = v.slice(0, s) + 'ε' + v.slice(end);
+  // place cursor just after inserted ε
+  ta.selectionStart = ta.selectionEnd = s + 'ε'.length;
+  ta.focus();
+});
+
+// Run
+document.getElementById('btn-run').onclick=initSim;
+document.getElementById('inp-s').addEventListener('keydown',e=>{
+  if(e.key==='Enter') initSim();
+});
+
+// Ctrl+Z = undo in simulation
+document.addEventListener('keydown',e=>{
+  if(!G.history.length) return;
+  const tag=e.target.tagName;
+  if(tag==='TEXTAREA'||tag==='INPUT') return;
+  if(e.key==='z'&&(e.ctrlKey||e.metaKey)){
+    e.preventDefault();
+    if(G.history.length>1) window.jumpTo(G.history.length-2);
+  }
+});
+
+/* ═══════════════════════════════════════════════════
+   BOOT — populate selector and load first example
+═══════════════════════════════════════════════════ */
+rebuildSelect(EXAMPLES[0].id);
+loadMachine(EXAMPLES[0]);
+</script>
+</body>
+</html>

@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Castor Ocupado Σ(3) — Decodificador & Simulador</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090f; --surf:#0e1120; --panel:#131629; --card:#191d2f;
+  --border:#252b44; --amber:#f5a623; --amber2:#ffc86b;
+  --green:#3dd68c; --red:#f06070; --blue:#5b9cf6; --violet:#a98bf0;
+  --text:#dde4f2; --muted:#5a6480;
+  --mono:'IBM Plex Mono',monospace;
+  --sans:'Barlow',sans-serif;
+  --cond:'Barlow Condensed',sans-serif;
+}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);
+  min-height:100vh;font-size:15px}
+
+/* ── HEADER ────────────────────────────── */
+.hdr{background:var(--surf);border-bottom:1px solid var(--border);
+  padding:.85rem 1.5rem;display:flex;align-items:baseline;gap:1.25rem;flex-wrap:wrap}
+.hdr-t{font-family:var(--cond);font-size:1.45rem;font-weight:700;
+  letter-spacing:3px;text-transform:uppercase;color:var(--amber)}
+.hdr-s{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+
+/* ── LAYOUT ────────────────────────────── */
+.app{display:grid;grid-template-columns:380px 1fr;gap:1.1rem;
+  padding:1.1rem;max-width:1400px;margin:0 auto;align-items:start}
+@media(max-width:980px){.app{grid-template-columns:1fr}}
+
+/* ── CARD ──────────────────────────────── */
+.card{background:var(--panel);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden;margin-bottom:1.1rem}
+.card:last-child{margin-bottom:0}
+.ch{background:var(--surf);border-bottom:1px solid var(--border);
+  padding:.5rem .9rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.ct{font-family:var(--cond);font-size:.74rem;font-weight:700;
+  letter-spacing:2px;color:var(--muted)}
+.cb{padding:.95rem}
+
+/* ── INPUT FIELD ───────────────────────── */
+.fl{display:block;font-family:var(--cond);font-size:.68rem;font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.32rem}
+.fh{font-family:var(--mono);font-size:.7rem;color:var(--muted);
+  margin-bottom:.45rem;line-height:1.7}
+input[type=text],input[type=number]{
+  width:100%;background:var(--surf);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-family:var(--mono);font-size:1.05rem;
+  padding:.55rem .7rem;outline:none;transition:border-color .15s}
+input:focus{border-color:var(--amber)}
+input[type=number]::-webkit-inner-spin-button{opacity:.5}
+.num-row{display:flex;gap:.55rem;align-items:stretch}
+.num-row input{flex:1}
+.bnav{padding:0 .85rem;background:var(--surf);border:1px solid var(--border);
+  border-radius:5px;color:var(--muted);font-family:var(--mono);font-size:1.1rem;
+  cursor:pointer;transition:all .15s;user-select:none}
+.bnav:hover{border-color:var(--amber);color:var(--amber)}
+.rng{font-family:var(--mono);font-size:.66rem;color:var(--muted);margin-top:.4rem}
+.err-num{font-family:var(--mono);font-size:.72rem;color:var(--red);
+  margin-top:.4rem;display:none}
+
+/* ── BINARY DISPLAY ────────────────────── */
+.binwrap{display:flex;flex-direction:column;gap:.6rem}
+.nibset{display:flex;flex-direction:column;gap:.3rem}
+.nibset-lbl{font-family:var(--cond);font-size:.66rem;font-weight:700;
+  letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.nibrow{display:flex;gap:.4rem;flex-wrap:wrap}
+.nibble{display:flex;flex-direction:column;align-items:center;gap:.25rem;
+  padding:.4rem .5rem;border-radius:6px;border:1px solid var(--border);
+  background:var(--card);min-width:84px}
+.nibble .bits{display:flex;gap:2px}
+.bit{width:20px;height:24px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:.92rem;font-weight:700;border-radius:3px}
+.bit.b-w{background:rgba(245,166,35,.16);color:var(--amber2)}
+.bit.b-d{background:rgba(91,156,246,.16);color:var(--blue)}
+.bit.b-s{background:rgba(169,139,240,.16);color:var(--violet)}
+.nib-meaning{font-family:var(--mono);font-size:.66rem;color:var(--muted);
+  text-align:center;line-height:1.3}
+.nib-state{font-family:var(--cond);font-size:.66rem;font-weight:700;
+  letter-spacing:1px;color:var(--text)}
+
+.bitkey{display:flex;gap:.85rem;flex-wrap:wrap;margin-top:.55rem;
+  font-family:var(--mono);font-size:.66rem;color:var(--muted)}
+.bitkey span{display:flex;align-items:center;gap:.3rem}
+.kdot{width:9px;height:9px;border-radius:2px}
+
+/* ── TABLE ─────────────────────────────── */
+table.tt{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.86rem}
+table.tt th,table.tt td{border:1px solid var(--border);padding:.45rem .6rem;text-align:center}
+table.tt th{background:var(--surf);color:var(--muted);font-family:var(--cond);
+  font-size:.74rem;letter-spacing:1.5px;text-transform:uppercase;font-weight:700}
+table.tt td.st{background:var(--surf);font-weight:700;color:var(--amber);
+  font-family:var(--cond);font-size:1rem;letter-spacing:1px}
+table.tt td .tr-w{color:var(--amber2)}
+table.tt td .tr-d{color:var(--blue)}
+table.tt td .tr-s{color:var(--violet);font-weight:700}
+table.tt td.halt-cell{color:var(--red)}
+
+/* ── CODE BLOCK ────────────────────────── */
+.codewrap{position:relative}
+pre.code{background:var(--surf);border:1px solid var(--border);border-radius:6px;
+  padding:.85rem 1rem;font-family:var(--mono);font-size:.82rem;line-height:1.65;
+  color:var(--text);overflow-x:auto;white-space:pre;margin:0}
+.code .c-key{color:var(--blue)}
+.code .c-state{color:var(--amber);font-weight:700}
+.code .c-num{color:var(--amber2)}
+.code .c-halt{color:var(--red)}
+.code .c-comment{color:var(--muted)}
+.btn-copy{position:absolute;top:.5rem;right:.5rem;
+  padding:.25rem .6rem;background:var(--card);border:1px solid var(--border);
+  border-radius:4px;color:var(--muted);font-family:var(--cond);font-size:.66rem;
+  font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.btn-copy:hover{border-color:var(--amber);color:var(--amber)}
+
+/* ── SIMULATOR ─────────────────────────── */
+.sim-ctrl{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.9rem}
+.bctrl{padding:.45rem .9rem;background:var(--surf);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);font-family:var(--cond);font-size:.8rem;
+  font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;transition:all .15s}
+.bctrl:hover:not(:disabled){border-color:var(--amber);color:var(--amber)}
+.bctrl:disabled{opacity:.3;cursor:default}
+.bctrl.primary{background:var(--amber);color:#07090f;border-color:var(--amber)}
+.bctrl.primary:hover{background:var(--amber2)}
+.bctrl.play.on{background:rgba(240,96,112,.12);border-color:rgba(240,96,112,.4);color:var(--red)}
+.spd{margin-left:auto;display:flex;align-items:center;gap:.5rem;
+  font-family:var(--mono);font-size:.7rem;color:var(--muted)}
+.spd input{width:90px}
+
+/* ── TAPE ──────────────────────────────── */
+.tape-view{padding:1.4rem .5rem 1.6rem;overflow:hidden;position:relative}
+.tape-track{display:flex;justify-content:center;gap:4px;min-width:min-content}
+.tcell{flex:0 0 auto;width:42px;height:42px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:1.25rem;font-weight:700;border-radius:6px;
+  border:1.5px solid var(--border);background:var(--card);color:var(--text);
+  transition:border-color .2s, background .2s, color .2s, box-shadow .2s, transform .2s;position:relative}
+.tcell.head{border-color:var(--amber);color:var(--amber);
+  background:rgba(245,166,35,.1);box-shadow:0 0 14px rgba(245,166,35,.3);transform:scale(1.08)}
+.tcell.one{color:var(--amber2)}
+.head-ptr{position:absolute;top:-1.25rem;left:50%;transform:translateX(-50%);
+  font-size:1rem;color:var(--amber)}
+/* origin marker: the cell where the head started (position 0) */
+.tcell.origin{border-color:var(--blue);border-style:dashed}
+.tcell.origin.head{border-color:var(--amber);border-style:solid}
+.origin-ptr{position:absolute;bottom:-1.15rem;left:50%;transform:translateX(-50%);
+  font-family:var(--cond);font-size:.6rem;font-weight:700;letter-spacing:.5px;
+  color:var(--blue);white-space:nowrap;text-transform:uppercase}
+
+/* ── STATUS BAR ────────────────────────── */
+.statusbar{display:flex;gap:.7rem;flex-wrap:wrap;align-items:center;
+  padding:.7rem .9rem;background:var(--surf);border-radius:6px;border:1px solid var(--border);
+  margin-bottom:.9rem;font-family:var(--mono);font-size:.78rem}
+.stat{display:flex;align-items:center;gap:.4rem}
+.stat-lbl{color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:1px;font-family:var(--cond);font-weight:700}
+.stat-val{color:var(--text);font-weight:700}
+.statepill{display:inline-flex;align-items:center;justify-content:center;
+  min-width:30px;height:26px;padding:0 .5rem;border-radius:5px;
+  font-family:var(--cond);font-weight:700;font-size:1rem;letter-spacing:1px;
+  background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.35)}
+.statepill.halt{background:rgba(240,96,112,.15);color:var(--red);border-color:rgba(240,96,112,.35)}
+.stat-val.ones{color:var(--amber2)}
+
+/* ── HALT BANNER ───────────────────────── */
+.haltbanner{display:none;align-items:center;gap:1rem;
+  padding:.85rem 1.1rem;border-radius:8px;border:1px solid;margin-top:.9rem}
+.haltbanner.show{display:flex}
+.haltbanner.ok{background:rgba(61,214,140,.07);border-color:rgba(61,214,140,.3)}
+.haltbanner.run{background:rgba(240,96,112,.07);border-color:rgba(240,96,112,.3)}
+.haltbanner.loop{background:rgba(169,139,240,.08);border-color:rgba(169,139,240,.35)}
+.hb-i{font-size:1.4rem}
+.hb-t{font-family:var(--cond);font-size:.98rem;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.haltbanner.ok .hb-i,.haltbanner.ok .hb-t{color:var(--green)}
+.haltbanner.run .hb-i,.haltbanner.run .hb-t{color:var(--red)}
+.haltbanner.loop .hb-i,.haltbanner.loop .hb-t{color:var(--violet)}
+.hb-s{font-family:var(--mono);font-size:.74rem;color:var(--muted);margin-top:.15rem}
+
+/* current transition highlight in table */
+table.tt tr.active-row td.st{box-shadow:inset 0 0 0 2px var(--amber)}
+table.tt td.active-cell{background:rgba(245,166,35,.12);box-shadow:inset 0 0 0 2px var(--amber)}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <span class="hdr-t">Castor Ocupado Σ(3)</span>
+  <span class="hdr-s">Decodificador de função de transição &amp; simulador · máquinas de Turing de 3 estados (A, B, C + H)</span>
+</div>
+
+<div class="app">
+
+  <!-- ════ LEFT COLUMN ════ -->
+  <div>
+    <!-- NUMBER INPUT -->
+    <div class="card">
+      <div class="ch"><span class="ct">Número da Máquina</span></div>
+      <div class="cb">
+        <div class="fh">Inteiro de 0 a 16.777.215 (2²⁴−1). Cada máquina de 3 estados corresponde a um número.</div>
+        <div class="num-row">
+          <button class="bnav" id="dec" title="−1">−</button>
+          <input type="number" id="num" min="0" max="16777215" step="1" value="11025149">
+          <button class="bnav" id="inc" title="+1">+</button>
+        </div>
+        <div class="rng" id="rng"></div>
+        <div class="err-num" id="errNum"></div>
+      </div>
+    </div>
+
+    <!-- BINARY -->
+    <div class="card">
+      <div class="ch"><span class="ct">Binário · Seis Nibbles</span></div>
+      <div class="cb">
+        <div class="binwrap" id="binwrap"></div>
+        <div class="bitkey">
+          <span><span class="kdot" style="background:var(--amber)"></span>escreve</span>
+          <span><span class="kdot" style="background:var(--blue)"></span>direção (0=L, 1=R)</span>
+          <span><span class="kdot" style="background:var(--violet)"></span>destino (00=H,01=A,10=B,11=C)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ RIGHT COLUMN ════ -->
+  <div>
+    <!-- TABLE -->
+    <div class="card">
+      <div class="ch"><span class="ct">Tabela de Transição δ</span></div>
+      <div class="cb"><div id="tablewrap"></div></div>
+    </div>
+
+    <!-- CODE -->
+    <div class="card">
+      <div class="ch"><span class="ct">Código (formato turingmachine.io)</span></div>
+      <div class="cb">
+        <div class="codewrap">
+          <button class="btn-copy" id="btnCopy">Copiar</button>
+          <pre class="code" id="codeblock"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIMULATOR -->
+    <div class="card">
+      <div class="ch"><span class="ct">Simulador</span></div>
+      <div class="cb">
+
+        <div class="sim-ctrl">
+          <button class="bctrl primary" id="bReset">⟲ Reiniciar</button>
+          <button class="bctrl" id="bStep">▶ Passo</button>
+          <button class="bctrl play" id="bPlay">⏵ Auto</button>
+          <div class="spd">
+            <span>veloc.</span>
+            <input type="range" id="speed" min="40" max="700" value="320" step="20">
+          </div>
+        </div>
+
+        <div class="statusbar">
+          <div class="stat"><span class="stat-lbl">Estado</span><span class="statepill" id="stState">A</span></div>
+          <div class="stat"><span class="stat-lbl">Passos</span><span class="stat-val" id="stSteps">0</span></div>
+          <div class="stat"><span class="stat-lbl">Uns na fita</span><span class="stat-val ones" id="stOnes">0</span></div>
+          <div class="stat"><span class="stat-lbl">Posição</span><span class="stat-val" id="stPos">0</span></div>
+        </div>
+
+        <div class="tape-view">
+          <div class="tape-track" id="tape"></div>
+        </div>
+
+        <div class="haltbanner" id="halt">
+          <span class="hb-i" id="hbI">✓</span>
+          <div>
+            <div class="hb-t" id="hbT">Parada (Halt)</div>
+            <div class="hb-s" id="hbS"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════
+   ENCODING CONVENTION  (verified against machine 11025149)
+   24-bit integer → 6 nibbles, order: A0 A1 B0 B1 C0 C1
+   Each nibble = W D SS
+     W  (bit 0) : symbol to write (0 or 1)
+     D  (bit 1) : direction  0=L , 1=R
+     SS (bits 2-3): destination state  00=H, 01=A, 10=B, 11=C
+═══════════════════════════════════════════════════ */
+const STATE_MAP = {'00':'H','01':'A','10':'B','11':'C'};
+const STATES = ['A','B','C'];
+const MAXN = 16777215;
+
+function decode(n){
+  const bin = n.toString(2).padStart(24,'0');
+  const nibbles = [];
+  for(let i=0;i<24;i+=4) nibbles.push(bin.slice(i,i+4));
+  // delta[state][read] = {write, dir, dest}
+  const delta = {};
+  let k=0;
+  for(const st of STATES){
+    delta[st] = {};
+    for(const rd of [0,1]){
+      const nib = nibbles[k++];
+      delta[st][rd] = {
+        write: parseInt(nib[0],10),
+        dir:   nib[1]==='0' ? 'L' : 'R',
+        dest:  STATE_MAP[nib.slice(2,4)],
+        nibble: nib,
+      };
+    }
+  }
+  return {bin, nibbles, delta};
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER — BINARY NIBBLES
+═══════════════════════════════════════════════════ */
+function renderBinary(dec){
+  const wrap = document.getElementById('binwrap');
+  let h='';
+  let k=0;
+  for(const st of STATES){
+    h+=`<div class="nibset">
+      <div class="nibset-lbl">Estado ${st}</div>
+      <div class="nibrow">`;
+    for(const rd of [0,1]){
+      const t = dec.delta[st][rd];
+      const nib = t.nibble;
+      h+=`<div class="nibble">
+        <div class="nib-state">lê ${rd}</div>
+        <div class="bits">
+          <span class="bit b-w">${nib[0]}</span>
+          <span class="bit b-d">${nib[1]}</span>
+          <span class="bit b-s">${nib[2]}</span>
+          <span class="bit b-s">${nib[3]}</span>
+        </div>
+        <div class="nib-meaning">→${t.write}, ${t.dir}, ${t.dest}</div>
+      </div>`;
+      k++;
+    }
+    h+=`</div></div>`;
+  }
+  wrap.innerHTML = h;
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER — TABLE
+═══════════════════════════════════════════════════ */
+function renderTable(dec){
+  let h=`<table class="tt">
+    <tr><th>δ</th><th>lê 0</th><th>lê 1</th></tr>`;
+  for(const st of STATES){
+    h+=`<tr data-state="${st}"><td class="st">${st}</td>`;
+    for(const rd of [0,1]){
+      const t=dec.delta[st][rd];
+      const halt = t.dest==='H';
+      h+=`<td data-state="${st}" data-read="${rd}" class="${halt?'halt-cell':''}">
+        <span class="tr-w">${t.write}</span>
+        <span class="tr-d">${t.dir}</span>
+        <span class="tr-s">${t.dest}</span>
+      </td>`;
+    }
+    h+=`</tr>`;
+  }
+  h+=`</table>`;
+  document.getElementById('tablewrap').innerHTML = h;
+}
+
+/* ═══════════════════════════════════════════════════
+   RENDER — CODE (turingmachine.io YAML-like format)
+═══════════════════════════════════════════════════ */
+// Single source of truth for the header comment, used by both
+// the displayed (HTML) and copied (plain-text) versions.
+function machineComment(dec, n){
+  return `# Máquina ${n.toLocaleString('pt-BR')}: ${dec.nibbles.join(' ')}`;
+}
+
+function buildCode(dec, n){
+  const L=[];
+  L.push(`<span class="c-comment">${machineComment(dec, n)}</span>`);
+  L.push('');
+  L.push(`<span class="c-key">input</span>: <span class="c-num">''</span>`);
+  L.push(`<span class="c-key">blank</span>: <span class="c-num">'0'</span>`);
+  L.push(`<span class="c-key">start state</span>: <span class="c-state">A</span>`);
+  L.push(`<span class="c-key">table</span>:`);
+  for(const st of STATES){
+    L.push(`  <span class="c-state">${st}</span>:`);
+    for(const rd of [0,1]){
+      const t=dec.delta[st][rd];
+      const dest = t.dest==='H'
+        ? `<span class="c-halt">halt</span>`
+        : `<span class="c-state">${t.dest}</span>`;
+      L.push(`    <span class="c-num">${rd}</span>: {<span class="c-key">write</span>: <span class="c-num">${t.write}</span>, <span class="c-key">${t.dir}</span>: ${dest}}`);
+    }
+    L.push('');
+  }
+  L.push(`  <span class="c-halt">halt</span>:`);
+  return L.join('\n');
+}
+
+// plain-text version for copying
+function buildCodePlain(dec, n){
+  const L=[];
+  L.push(machineComment(dec, n));
+  L.push('');
+  L.push(`input: ''`);
+  L.push(`blank: '0'`);
+  L.push(`start state: A`);
+  L.push(`table:`);
+  for(const st of STATES){
+    L.push(`  ${st}:`);
+    for(const rd of [0,1]){
+      const t=dec.delta[st][rd];
+      const dest = t.dest==='H' ? 'halt' : t.dest;
+      L.push(`    ${rd}: {write: ${t.write}, ${t.dir}: ${dest}}`);
+    }
+    L.push('');
+  }
+  L.push(`  halt:`);
+  return L.join('\n');
+}
+
+/* ═══════════════════════════════════════════════════
+   SIMULATOR
+═══════════════════════════════════════════════════ */
+const SIM = {
+  delta:null, tape:null, head:0, state:'A', steps:0,
+  halted:false, looping:false, playTimer:null, minIdx:0, maxIdx:0,
+};
+
+function simReset(dec){
+  SIM.delta = dec.delta;
+  SIM.tape  = new Map();   // index → 0/1 (absent = blank 0)
+  SIM.head  = 0;
+  SIM.state = 'A';
+  SIM.steps = 0;
+  SIM.halted= false;
+  SIM.looping= false;
+  SIM.minIdx= -3;
+  SIM.maxIdx= 3;
+  SIM.viewLeft = undefined;   // re-centre the viewport on the head
+  SIM.prevHead = undefined;   // no travel direction yet
+  stopPlay();
+  drawSim();
+  hideHalt();
+}
+
+function tapeGet(i){ return SIM.tape.get(i) || 0; }
+
+// S(3) = 21 is the proven maximum number of steps for a halting 3-state machine.
+// If a machine exceeds 21 steps without halting, it provably never will.
+const BB3_MAX_STEPS = 21;
+
+function simStep(){
+  if(SIM.halted || SIM.looping) return;
+  const read = tapeGet(SIM.head);
+  const t = SIM.delta[SIM.state][read];
+
+  // write
+  if(t.write===0) SIM.tape.delete(SIM.head);
+  else SIM.tape.set(SIM.head, 1);
+
+  // move (remember previous head position for viewport travel direction)
+  SIM.prevHead = SIM.head;
+  SIM.head += (t.dir==='R') ? 1 : -1;
+  if(SIM.head < SIM.minIdx) SIM.minIdx = SIM.head;
+  if(SIM.head > SIM.maxIdx) SIM.maxIdx = SIM.head;
+
+  // state
+  SIM.state = t.dest;
+  SIM.steps++;
+
+  if(SIM.state==='H'){
+    SIM.halted = true;
+    stopPlay();
+  } else if(SIM.steps > BB3_MAX_STEPS){
+    // Exceeded the proven S(3) bound without halting → provably non-halting.
+    SIM.looping = true;
+    stopPlay();
+  }
+  drawSim();
+  if(SIM.halted) showHalt();
+  else if(SIM.looping) showLoop();
+}
+
+function countOnes(){
+  let c=0;
+  for(const v of SIM.tape.values()) if(v===1) c++;
+  return c;
+}
+
+/* ── DRAW ── */
+// Fixed viewport of VIEW_W cells. The window is positioned to keep BOTH the
+// head and the written portion of the tape visible. When the machine walks
+// steadily in one direction it leaves a trail of 1s behind; that trail must
+// stay on screen, so we frame the union of {head} and the written span,
+// giving the head MARGIN cells of look-ahead in its direction of travel.
+const VIEW_W  = 23;   // cells shown at once (never exceeded)
+const MARGIN  = 3;    // look-ahead cells kept ahead of the head when space allows
+const CELL_PX = 42;
+const GAP_PX  = 4;
+
+function writtenSpan(){
+  // returns [minIdx, maxIdx] of cells currently holding a 1, or null if none
+  let mn=Infinity, mx=-Infinity;
+  for(const [k,v] of SIM.tape){ if(v===1){ if(k<mn)mn=k; if(k>mx)mx=k; } }
+  return mn===Infinity ? null : [mn,mx];
+}
+
+function computeViewLeft(){
+  const head = SIM.head;
+  const origin = 0;                       // starting head position
+  const span = writtenSpan();
+
+  // HARD INVARIANT: both the head and the origin marker must always be visible.
+  // The window must therefore cover the closed interval [min(head,origin), max(head,origin)].
+  // Across all 3-state machines up to the loop cutoff, that interval never exceeds
+  // 22 cells, so it always fits inside VIEW_W = 23.
+  const must_lo = Math.min(head, origin);
+  const must_hi = Math.max(head, origin);
+
+  // Preferred framing: also include look-ahead in front of the head and the
+  // whole written trail, when space permits.
+  let want_lo = Math.min(must_lo, head - MARGIN);
+  let want_hi = Math.max(must_hi, head + MARGIN);
+  if(span){
+    want_lo = Math.min(want_lo, span[0]);
+    want_hi = Math.max(want_hi, span[1]);
+  }
+
+  const wantW = want_hi - want_lo + 1;
+
+  let vl;
+  if(wantW <= VIEW_W){
+    // Everything desired fits: centre the wanted interval, using any slack.
+    const slack = VIEW_W - wantW;
+    vl = want_lo - Math.floor(slack/2);
+  } else {
+    // Desired framing overflows. Keep the MANDATORY interval [must_lo, must_hi]
+    // fully visible, and spend the remaining cells on whichever side carries
+    // the action (the head's travel direction / the trail).
+    const mustW = must_hi - must_lo + 1;   // guaranteed ≤ VIEW_W
+    const extra = VIEW_W - mustW;          // free cells to distribute
+    const dir = (SIM.prevHead===undefined) ? 0 : Math.sign(head - SIM.prevHead);
+    if(head <= origin){
+      // head is at/left of origin. Mandatory block is [head, origin].
+      // Give look-ahead to the LEFT of the head (its travel side); rest to right.
+      const leftGive = Math.min(extra, MARGIN);
+      vl = must_lo - leftGive;
+    } else {
+      // head is right of origin. Mandatory block is [origin, head].
+      // Give look-ahead to the RIGHT of the head → shift window left minimally.
+      const rightGive = Math.min(extra, MARGIN);
+      vl = must_hi + rightGive - (VIEW_W - 1);
+    }
+  }
+
+  // Final safety clamp: never drop head or origin out of the window.
+  if(vl > must_lo)               vl = must_lo;
+  if(vl + VIEW_W - 1 < must_hi)  vl = must_hi - (VIEW_W - 1);
+  return vl;
+}
+
+function drawSim(){
+  SIM.viewLeft = computeViewLeft();
+
+  const lo = SIM.viewLeft;
+  const hi = SIM.viewLeft + VIEW_W - 1;
+
+  const track=document.getElementById('tape');
+  let h='';
+  for(let i=lo;i<=hi;i++){
+    const v=tapeGet(i);
+    const isHead=(i===SIM.head);
+    const isOrigin=(i===0);
+    const cls = ['tcell', isHead?'head':'', v===1?'one':'', isOrigin?'origin':'']
+                .filter(Boolean).join(' ');
+    h+=`<div class="${cls}">
+      ${isHead?'<span class="head-ptr">▼</span>':''}${v}${isOrigin?'<span class="origin-ptr">início</span>':''}
+    </div>`;
+  }
+  track.innerHTML=h;
+  track.style.transform = 'translateX(0)';
+
+  // status
+  document.getElementById('stSteps').textContent = SIM.steps;
+  const stepsEl = document.getElementById('stSteps');
+  stepsEl.style.color = SIM.looping ? 'var(--violet)' : '';
+  document.getElementById('stOnes').textContent  = countOnes();
+  document.getElementById('stPos').textContent   = SIM.head;
+  const sp = document.getElementById('stState');
+  sp.textContent = SIM.state==='H' ? 'H' : SIM.state;
+  sp.className = 'statepill' + (SIM.state==='H' ? ' halt':'');
+
+  highlightTable();
+}
+
+function highlightTable(){
+  document.querySelectorAll('table.tt td.active-cell').forEach(td=>td.classList.remove('active-cell'));
+  document.querySelectorAll('table.tt tr.active-row').forEach(tr=>tr.classList.remove('active-row'));
+  if(SIM.halted || SIM.looping) return;
+  const read = tapeGet(SIM.head);
+  const cell = document.querySelector(`table.tt td[data-state="${SIM.state}"][data-read="${read}"]`);
+  if(cell){
+    cell.classList.add('active-cell');
+    cell.closest('tr').classList.add('active-row');
+  }
+}
+
+function showHalt(){
+  const b=document.getElementById('halt');
+  b.className='haltbanner show ok';
+  document.getElementById('hbI').textContent='✓';
+  document.getElementById('hbT').textContent='Parada (Halt)';
+  document.getElementById('hbS').textContent=
+    `A máquina parou após ${SIM.steps} passos, com ${countOnes()} uns na fita.`;
+}
+function showLoop(){
+  const b=document.getElementById('halt');
+  b.className='haltbanner show loop';
+  document.getElementById('hbI').textContent='∞';
+  document.getElementById('hbT').textContent='Laço Infinito';
+  document.getElementById('hbS').textContent=
+    `Ultrapassou S(3) = ${BB3_MAX_STEPS} passos sem parar. Como o máximo provado para uma máquina de 3 estados que para é 21, esta máquina nunca parará.`;
+}
+function hideHalt(){ document.getElementById('halt').className='haltbanner'; }
+
+/* ── PLAY ── */
+function stopPlay(){
+  if(SIM.playTimer){ clearInterval(SIM.playTimer); SIM.playTimer=null; }
+  const b=document.getElementById('bPlay');
+  b.classList.remove('on'); b.textContent='⏵ Auto';
+}
+function togglePlay(){
+  if(SIM.playTimer){ stopPlay(); return; }
+  if(SIM.halted || SIM.looping) return;
+  const b=document.getElementById('bPlay');
+  b.classList.add('on'); b.textContent='⏸ Pausar';
+  const delay = 740 - parseInt(document.getElementById('speed').value,10);
+  SIM.playTimer=setInterval(()=>{
+    if(SIM.halted || SIM.looping){ stopPlay(); return; }
+    simStep();
+  }, delay);
+}
+
+/* ═══════════════════════════════════════════════════
+   MAIN — load a number, render everything
+═══════════════════════════════════════════════════ */
+let CURRENT = null;
+
+function loadNumber(n){
+  n = Math.max(0, Math.min(MAXN, Math.floor(n)));
+  CURRENT = n;
+  const dec = decode(n);
+  document.getElementById('rng').textContent =
+    `binário (24 bits): ${dec.nibbles.join(' ')}`;
+  renderBinary(dec);
+  renderTable(dec);
+  document.getElementById('codeblock').innerHTML = buildCode(dec, n);
+  document.getElementById('codeblock').dataset.plain = buildCodePlain(dec, n);
+  simReset(dec);
+}
+
+/* ═══════════════════════════════════════════════════
+   EVENTS
+═══════════════════════════════════════════════════ */
+const numEl=document.getElementById('num');
+
+function readNum(){
+  let v = parseInt(numEl.value,10);
+  const err=document.getElementById('errNum');
+  if(isNaN(v)){ err.textContent='Digite um inteiro válido.'; err.style.display=''; return null; }
+  if(v<0||v>MAXN){ err.textContent=`Fora do intervalo 0 – ${MAXN.toLocaleString('pt-BR')}.`; err.style.display=''; }
+  else err.style.display='none';
+  return Math.max(0,Math.min(MAXN,v));
+}
+
+numEl.addEventListener('input', ()=>{
+  const v=readNum();
+  if(v!==null) loadNumber(v);
+});
+document.getElementById('inc').onclick=()=>{
+  let v=Math.min(MAXN,(parseInt(numEl.value,10)||0)+1);
+  numEl.value=v; loadNumber(v);
+};
+document.getElementById('dec').onclick=()=>{
+  let v=Math.max(0,(parseInt(numEl.value,10)||0)-1);
+  numEl.value=v; loadNumber(v);
+};
+
+document.getElementById('bReset').onclick=()=>{ if(CURRENT!==null) simReset(decode(CURRENT)); };
+document.getElementById('bStep').onclick =()=>{ stopPlay(); simStep(); };
+document.getElementById('bPlay').onclick =togglePlay;
+
+document.getElementById('btnCopy').onclick=()=>{
+  const txt=document.getElementById('codeblock').dataset.plain||'';
+  navigator.clipboard.writeText(txt).then(()=>{
+    const b=document.getElementById('btnCopy');
+    const o=b.textContent; b.textContent='Copiado ✓';
+    setTimeout(()=>b.textContent=o,1400);
+  });
+};
+
+/* ═══════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════ */
+loadNumber(11025149);
+</script>
+</body>
+</html>
