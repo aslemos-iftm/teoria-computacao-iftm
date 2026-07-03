@@ -21,7 +21,7 @@ public class Conexao {
     
     private static Connection getConexao() throws Exception {
         Class.forName("org.apache.derby.jdbc.ClientDriver");
-        return DriverManager.getConnection("jdbc:derby://localhost:1527/mturing", "aslemos","senha");
+        return DriverManager.getConnection("jdbc:derby://localhost:1527/mturing", "USUÁRIO","SENHA");
     }   
     
     public static void salvarExecucao(List<MTdados> mtDadosList) throws Exception {
