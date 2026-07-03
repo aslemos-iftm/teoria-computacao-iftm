@@ -22,50 +22,67 @@ O identificador (campo `ID`) de cada máquina é a conversão para decimal da re
 
 ## Tecnologias
 
-O projeto foi desenvolvido no **Apache NetBeans** e usa o **Apache Derby** como banco de dados, acessado em modo cliente/servidor (Derby Network Server) via JDBC. Aqui estão disponíveis apenas os fontes.
+O projeto foi desenvolvido no **Apache NetBeans** e usa o **Apache Derby** como banco de dados, acessado em modo cliente/servidor (Derby Network Server) via JDBC. Dentro do NetBeans, o Derby aparece com o nome **"Java DB"**. Todo o preparo do banco descrito abaixo é feito pela própria IDE.
 
 ---
 
-## Como preparar o ambiente
-
-As instruções a seguir permitem recriar o banco de dados localmente, do zero.
+## Preparação do banco de dados (tudo pelo NetBeans)
 
 ### 1. Instalar o Apache Derby
 
-Baixe a distribuição binária do Apache Derby em <https://db.apache.org/derby/derby_downloads.html> (versão 10.14 ou superior é recomendada; qualquer versão >= 10.7 suporta o tipo `BOOLEAN` usado aqui). Descompacte em uma pasta de sua escolha — essa pasta será referida como `DERBY_HOME`.
+Antes de mais nada, é preciso ter o Apache Derby instalado, pois o NetBeans precisa saber onde encontrá-lo.
 
-A distribuição já inclui:
-- o servidor de rede (`derbynet.jar`),
-- o driver cliente JDBC (`derbyclient.jar`),
-- a ferramenta interativa de linha de comando **`ij`**, usada abaixo para criar a tabela.
+1. Baixe a distribuição binária do Apache Derby em <https://db.apache.org/derby/derby_downloads.html>. Recomenda-se a versão 10.14 ou superior (qualquer versão >= 10.7 suporta o tipo `BOOLEAN` usado no projeto).
+2. Descompacte o arquivo em uma pasta de sua escolha — por exemplo `C:\\Apache\\db-derby` no Windows, ou `~/apache/db-derby` no Linux. Essa pasta contém as subpastas `lib`, `bin`, etc.
 
-### 2. Iniciar o servidor Derby
+> **Observação.** Versões antigas do NetBeans (quando ainda distribuído pela Oracle) já vinham com o Java DB embutido, junto ao GlassFish. Nas versões atuais do **Apache** NetBeans, pode ser necessário instalar o Derby separadamente, como descrito acima, e apontar o caminho para a IDE (passo 2).
 
-Em um terminal, a partir de `DERBY_HOME`:
+### 2. Registrar a instalação do Derby no NetBeans
 
-```bash
-# Linux / macOS / WSL
-java -jar lib/derbyrun.jar server start
+1. Abra o NetBeans e vá até a aba **Services** (menu *Window → Services*, ou `Ctrl+5`).
+2. Expanda o nó **Databases**. Dentro dele deve aparecer o nó **Java DB**.
+3. Clique com o botão direito em **Java DB** e escolha **Properties**.
+4. No campo **Java DB Installation**, informe o caminho da pasta onde você descompactou o Derby (a pasta que contém a subpasta `lib`). Confirme com **OK**.
 
-# Windows (prompt de comando)
-java -jar lib\\derbyrun.jar server start
+### 3. Iniciar o servidor Java DB
+
+Ainda na aba **Services**, clique com o botão direito no nó **Java DB** e escolha **Start Server**.
+
+Uma aba chamada *Java DB Database Process* abrirá na janela de saída (Output), exibindo uma mensagem semelhante a:
+
+```
+Apache Derby Network Server - 10.x.x.x started and ready to accept connections on port 1527
 ```
 
-O servidor sobe na porta padrão **1527**, que é a que o código espera (`jdbc:derby://localhost:1527/`). Deixe esse terminal aberto — o servidor precisa continuar rodando enquanto o programa Java é executado.
+A porta **1527** é a porta padrão e é exatamente a que o código do projeto espera (`jdbc:derby://localhost:1527/`). O servidor precisa permanecer iniciado enquanto o programa Java for executado.
 
-### 3. Criar o banco e a tabela
+### 4. Criar o banco de dados `mturing`
 
-Em **outro** terminal, inicie a ferramenta `ij`:
+1. No menu principal, escolha **Tools → Java DB Database → Create Database…**
+2. Na caixa de diálogo *Create Java DB Database*, preencha:
+   - **Database Name:** `mturing`
+   - **User Name:** um usuário à sua escolha (por exemplo, `mturing`)
+   - **Password:** uma senha à sua escolha 
+3. Confirme com **OK**.
 
-```bash
-java -jar lib/derbyrun.jar ij
+O NetBeans cria o banco e, automaticamente, uma conexão para ele. Anote o usuário e a senha escolhidos: eles precisarão coincidir com os que constam na classe `Conexao.java` (veja o passo 7).
+
+### 5. Conectar-se ao banco
+
+Na aba **Services**, dentro de **Databases**, localize o nó da conexão:
+
+```
+jdbc:derby://localhost:1527/mturing
 ```
 
-Dentro do `ij`, execute os comandos abaixo. O primeiro cria (e conecta a) o banco de dados chamado `mturing`; o atributo `create=true` faz o Derby criá-lo caso ainda não exista:
+Se o ícone estiver "quebrado" (desconectado), clique com o botão direito nele e escolha **Connect**. Quando conectado, o ícone fica inteiro e o nó pode ser expandido, revelando as subpastas **Tables**, **Views** e **Procedures**.
+
+### 6. Criar a tabela TB_EXECUCOES
+
+1. Expanda o nó da conexão `mturing`, clique com o botão direito na subpasta **Tables** e escolha **Execute Command…** (abre um editor SQL já conectado ao banco).
+2. Cole o script abaixo no editor e execute-o (botão *Run SQL*, ou `Ctrl+Shift+E`):
 
 ```sql
-CONNECT 'jdbc:derby://localhost:1527/mturing;create=true';
-
 CREATE TABLE TB_EXECUCOES (
     ID       INTEGER  NOT NULL PRIMARY KEY,
     PAROU    BOOLEAN,
@@ -75,54 +92,50 @@ CREATE TABLE TB_EXECUCOES (
 );
 ```
 
-> **Nota sobre os tipos.** O código Java grava os cinco campos com `setInt`/`setBoolean`. O `ID` varia de 0 a 16.777.215, o que cabe folgadamente em `INTEGER`. Os demais campos (`PASSOS`, `UNS`, `TAM_FITA`) assumem valores pequenos no universo de 3 estados (limitados por S(3) = 21 e vizinhança), cabendo em `SMALLINT`. Se preferir uniformizar, pode declarar todos como `INTEGER` sem qualquer prejuízo.
+3. Para conferir, clique com o botão direito no nó **Tables** e escolha **Refresh**. A tabela `TB_EXECUCOES` deve aparecer na árvore.
+
+> **Nota sobre os tipos.** O código Java grava os cinco campos com `setInt`/`setBoolean`. O `ID` varia de 0 a 16.777.215, cabendo em `INTEGER`. Os demais campos (`PASSOS`, `UNS`, `TAM_FITA`) assumem valores pequenos no universo de 3 estados (limitados por S(3) = 21 e vizinhança), cabendo em `SMALLINT`. Se preferir uniformizar, pode declarar todos como `INTEGER` sem qualquer prejuízo.
 >
 > **Versões antigas do Derby.** O tipo `BOOLEAN` em `CREATE TABLE` só é suportado a partir do Derby 10.7. Em versões anteriores, substitua `PAROU BOOLEAN` por `PAROU SMALLINT` (0 = falso, 1 = verdadeiro) e ajuste o `setBoolean` correspondente no código.
 
-Para conferir se a tabela foi criada, ainda no `ij`:
+### 7. Ajustar as credenciais no código
 
-```sql
-DESCRIBE TB_EXECUCOES;
-```
-
-Para sair do `ij`:
-
-```sql
-EXIT;
-```
-
-### 4. Configurar as credenciais de conexão
-
-A classe `MTgerador/Conexao.java` define a URL de conexão, o usuário e a senha do banco. Ajuste-os para as credenciais que você deseja usar no seu ambiente local:
+Abra a classe `MTgerador/Conexao.java` e verifique se a URL, o usuário e a senha coincidem com o banco que você criou:
 
 ```java
 return DriverManager.getConnection(
     "jdbc:derby://localhost:1527/mturing", "USUARIO", "SENHA");
 ```
 
-> **Importante.** Não versione credenciais reais em um repositório público. Substitua `USUARIO` e `SENHA` pelos valores do seu ambiente apenas localmente, ou externalize-os (por exemplo, via variáveis de ambiente ou um arquivo de configuração não incluído no controle de versão). Para uma instalação local simples de desenvolvimento, o Derby aceita conexões sem autenticação forte configurada — nesse caso os valores de usuário e senha servem apenas para identificar o esquema.
+Substitua `USUARIO` e `SENHA` pelos valores que você definiu no passo 4.
 
-### 5. Configurar o projeto no NetBeans
+> **Importante.** Não versione credenciais reais em um repositório público. Ajuste esses valores apenas no seu ambiente local, ou externalize-os (por exemplo, via variáveis de ambiente).
 
-1. Crie um projeto `MTgerador` no Apache NetBeans, e importe os arquivos-fonte.
-2. Adicione o driver cliente do Derby ao *classpath* do projeto: o arquivo `derbyclient.jar`, encontrado em `DERBY_HOME/lib`. No NetBeans: clique com o botão direito no projeto → *Properties* → *Libraries* → *Add JAR/Folder* → selecione `derbyclient.jar`.
-3. Certifique-se de que o servidor Derby (passo 2) está rodando e de que a tabela foi criada (passo 3).
+### 8. Adicionar o driver do Derby ao projeto
 
-### 6. Executar
+O programa usa o driver **cliente** do Derby (`org.apache.derby.jdbc.ClientDriver`). É preciso incluí-lo no *classpath* do projeto:
 
-Execute a classe `MTMain`. Ela percorre todas as máquinas, simula cada uma e grava os resultados em lotes de 50.000 registros na tabela `TB_EXECUCOES`. Ao final, a tabela conterá um registro por máquina (16.777.216 no total).
+1. Clique com o botão direito no projeto `MTgerador` na aba **Projects** e escolha **Properties**.
+2. Selecione a categoria **Libraries**.
+3. Clique em **Add JAR/Folder** e selecione o arquivo `derbyclient.jar`, localizado na subpasta `lib` da instalação do Derby.
+4. Confirme com **OK**.
 
-O método `Conexao.limpa()` é chamado no início da execução para esvaziar a tabela, de modo que execuções repetidas não acumulem registros duplicados.
+### 9. Executar
+
+Com o servidor iniciado (passo 3) e a tabela criada (passo 6), execute a classe `MTMain` (botão direito sobre ela → **Run File**, ou `Shift+F6`).
+
+O programa percorre todas as máquinas, simula cada uma e grava os resultados em lotes de 50.000 registros na tabela `TB_EXECUCOES`. Ao final, a tabela conterá um registro por máquina (16.777.216 no total). O método `Conexao.limpa()`, chamado no início da execução, esvazia a tabela antes de começar, evitando duplicatas em execuções repetidas.
+
+Para inspecionar os resultados, na aba **Services**, clique com o botão direito na tabela `TB_EXECUCOES` e escolha **View Data**.
 
 ---
 
 ## Estrutura da tabela TB_EXECUCOES
 
-| Coluna     | Tipo     | Descrição                                                        |
-|------------|----------|------------------------------------------------------------------|
-| `ID`       | INTEGER  | Identificador da máquina (0 a 16.777.215)                        |
-| `PAROU`    | BOOLEAN  | Se a máquina parou dentro do limite de 21 passos                |
-| `PASSOS`   | SMALLINT | Número de passos executados                                     |
-| `UNS`      | SMALLINT | Quantidade de 1s deixados na fita                               |
-| `TAM_FITA` | SMALLINT | Tamanho final da fita                                           |
-
+| Coluna     | Tipo     | Descrição                                             |
+|------------|----------|-------------------------------------------------------|
+| `ID`       | INTEGER  | Identificador da máquina (0 a 16.777.215)            |
+| `PAROU`    | BOOLEAN  | Se a máquina parou dentro do limite de 21 passos    |
+| `PASSOS`   | SMALLINT | Número de passos executados                         |
+| `UNS`      | SMALLINT | Quantidade de 1s deixados na fita                   |
+| `TAM_FITA` | SMALLINT | Tamanho final da fita                               |
